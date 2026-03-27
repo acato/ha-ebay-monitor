@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "eBay API Credentials",
+        "description": "Enter your eBay Developer Program credentials. Get them at {developer_url}",
+        "data": {
+          "app_id": "App ID (Client ID)",
+          "cert_id": "Cert ID (Client Secret)",
+          "site": "eBay Marketplace"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid credentials. Verify your App ID and Cert ID at developer.ebay.com."
+    },
+    "abort": {
+      "already_configured": "This eBay account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "eBay Monitor Searches",
+        "description": "{searches}",
+        "menu_options": {
+          "add_search": "Add a new search",
+          "remove_search": "Remove a search"
+        }
+      },
+      "add_search": {
+        "title": "Add eBay Search",
+        "data": {
+          "search_name": "Search name (slug, e.g. nvidia_a100)",
+          "search_query": "Search keywords",
+          "max_price": "Maximum price (USD)",
+          "min_price": "Minimum price (USD)",
+          "condition": "Item condition(s)",
+          "location_country": "Seller country (e.g. US, GB, DE)",
+          "buying_options": "Listing type(s)",
+          "category_id": "eBay category ID (optional)",
+          "scan_interval": "Scan interval (minutes)"
+        }
+      },
+      "remove_search": {
+        "title": "Remove eBay Search",
+        "data": {
+          "search_to_remove": "Search to remove"
+        }
+      }
+    },
+    "error": {
+      "name_exists": "A search with this name already exists."
+    }
+  }
+}

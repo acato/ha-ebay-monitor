@@ -1,0 +1,12 @@
+{
+  "domain": "ebay_monitor",
+  "name": "eBay Monitor",
+  "codeowners": ["@acato"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/acato/ha-ebay-monitor",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/acato/ha-ebay-monitor/issues",
+  "requirements": ["aiohttp>=3.8.0"],
+  "version": "1.0.0"
+}
