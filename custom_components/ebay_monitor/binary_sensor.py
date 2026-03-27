@@ -56,10 +56,13 @@ class EbayMonitorMatchSensor(
 
     @property
     def is_on(self) -> bool | None:
-        """Return True if new listings were found in the last scan."""
+        """Return True if new listings or price drops were found in the last scan."""
         if self.coordinator.data is None:
             return None
-        return len(self.coordinator.new_listing_ids) > 0
+        return (
+            len(self.coordinator.new_listing_ids) > 0
+            or len(getattr(self.coordinator, "price_drop_ids", [])) > 0
+        )
 
     @property
     def available(self) -> bool:

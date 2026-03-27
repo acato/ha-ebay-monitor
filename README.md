@@ -12,7 +12,8 @@ A custom Home Assistant integration that monitors eBay for items matching your s
 - **Actionable push notifications** -- tap "View on eBay" or "Buy Now" to open the listing directly on your phone
 - **Multi-channel alerts** -- trigger any HA notification service (push, email, SMS, Telegram, etc.)
 - **Rich notification data** -- listing title, price, thumbnail image, seller rating, bid count, time remaining
-- **Deduplication** -- tracks seen listings persistently so you only get notified once per item
+- **Price drop detection** -- re-alerts you when a previously-seen listing drops in price, with previous price, drop amount, and percentage
+- **Deduplication** -- tracks seen listings with prices persistently so you only get notified once per item (unless the price changes)
 - **Critical deal alerts** -- bypass Do Not Disturb for exceptional prices
 - **Daily digest** -- optional summary of active search results
 - **Multiple marketplace support** -- US, UK, DE, FR, IT, ES, CA, AU
@@ -261,6 +262,43 @@ Send to multiple notification channels simultaneously:
         notification_id: "ebay_{{ trigger.event.data.item_id }}"
 ```
 
+#### Price Drop Alert
+
+Get notified when a previously-seen listing drops in price:
+
+```yaml
+- id: ebay_monitor_price_drop
+  alias: "eBay Monitor - Price Drop Alert"
+  mode: queued
+  max: 20
+
+  trigger:
+    - platform: event
+      event_type: ebay_monitor_price_drop
+
+  action:
+    - action: notify.mobile_app_YOUR_PHONE
+      data:
+        title: "Price Drop: {{ trigger.event.data.search_name }}"
+        message: >-
+          {{ trigger.event.data.title }}
+          Was ${{ "%.2f" | format(trigger.event.data.previous_price) }}
+          Now ${{ "%.2f" | format(trigger.event.data.price) }}
+          (-{{ trigger.event.data.drop_percentage }}%)
+        data:
+          image: "{{ trigger.event.data.image_url }}"
+          url: "{{ trigger.event.data.url }}"
+          actions:
+            - action: "URI"
+              title: "View on eBay"
+              uri: "{{ trigger.event.data.url }}"
+            - action: "URI"
+              title: "Buy Now"
+              uri: "{{ trigger.event.data.url }}"
+          channel: "eBay Price Drops"
+          importance: high
+```
+
 #### Daily Digest
 
 Get a summary of all active listings once per day:
@@ -338,12 +376,25 @@ The `ebay_monitor_new_listing` event carries this data:
 | `item_location` | string | Seller location |
 | `category` | string | eBay category name |
 
+### Price Drop Event: `ebay_monitor_price_drop`
+
+Fired when a previously-seen listing's price decreases. Contains all the same fields as `ebay_monitor_new_listing`, plus:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `previous_price` | float | The price from the last scan |
+| `drop_amount` | float | Absolute price decrease |
+| `drop_percentage` | float | Percentage decrease |
+
 ## How It Works
 
 1. The integration polls the [eBay Browse API](https://developer.ebay.com/api-docs/buy/browse/resources/item_summary/methods/search) at your configured interval using application-level OAuth tokens (client credentials grant)
 2. Results are sorted by `newlyListed` to catch the freshest listings first
-3. Each listing ID is checked against the persistent deduplication store -- only truly new listings trigger events
-4. For each new listing, an `ebay_monitor_new_listing` event is fired on the HA event bus
+3. Each listing is checked against the persistent store which tracks both item IDs and prices:
+   - **New listing** (never seen before) → fires `ebay_monitor_new_listing`
+   - **Price drop** (seen before, but price decreased) → fires `ebay_monitor_price_drop`
+   - **Unchanged** (same ID, same or higher price) → no event
+4. Events are fired on the HA event bus for your automations to handle
 5. Your automations listen for these events and route notifications however you want
 6. Seen IDs are persisted across HA restarts (rolling window of 1,000 IDs per search)
 

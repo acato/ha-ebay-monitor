@@ -224,3 +224,44 @@
           {% else %}
           No new listings found.
           {% endif %}
+
+# ---------------------------------------------------------------------------
+# 5. PRICE DROP ALERT - Notify when a previously-seen listing drops in price
+# ---------------------------------------------------------------------------
+# Fires on the ebay_monitor_price_drop event, which includes the previous
+# price, drop amount, and drop percentage alongside all listing details.
+# ---------------------------------------------------------------------------
+- id: ebay_monitor_price_drop
+  alias: "eBay Monitor - Price Drop Alert"
+  description: "Alert when a previously-seen listing drops in price"
+  mode: queued
+  max: 20
+
+  trigger:
+    - platform: event
+      event_type: ebay_monitor_price_drop
+
+  action:
+    - action: notify.mobile_app_iphone_13
+      data:
+        title: "Price Drop: {{ trigger.event.data.search_name }}"
+        message: >-
+          {{ trigger.event.data.title }}
+          Was ${{ "%.2f" | format(trigger.event.data.previous_price) }}
+          Now ${{ "%.2f" | format(trigger.event.data.price) }}
+          (-{{ trigger.event.data.drop_percentage }}%)
+          Seller: {{ trigger.event.data.seller_name }}
+        data:
+          image: "{{ trigger.event.data.image_url }}"
+          url: "{{ trigger.event.data.url }}"
+          clickAction: "{{ trigger.event.data.url }}"
+          actions:
+            - action: "URI"
+              title: "View on eBay"
+              uri: "{{ trigger.event.data.url }}"
+            - action: "URI"
+              title: "Buy Now"
+              uri: "{{ trigger.event.data.url }}"
+          group: "ebay_{{ trigger.event.data.search_name }}"
+          channel: "eBay Price Drops"
+          importance: high

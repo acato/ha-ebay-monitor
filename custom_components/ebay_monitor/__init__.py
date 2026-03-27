@@ -32,6 +32,7 @@ from .const import (
     DEFAULT_SITE,
     DOMAIN,
     EVENT_NEW_LISTING,
+    EVENT_PRICE_DROP,
     PLATFORMS,
 )
 from .ebay_api import EbayApiClient, EbaySearchResult
@@ -157,16 +158,24 @@ class EbaySearchCoordinator(DataUpdateCoordinator[EbaySearchResult]):
         if result.error:
             raise UpdateFailed(f"eBay API error: {result.error}")
 
-        # Deduplication: find new listings
-        seen_ids = self._store.get_seen_ids(self.search_name)
-        new_listings = [
-            listing for listing in result.listings
-            if listing.item_id not in seen_ids
-        ]
+        # Classify listings: new vs price-dropped vs unchanged
+        seen = self._store.get_seen(self.search_name)
+        new_listings = []
+        price_drops = []
+
+        for listing in result.listings:
+            prev_price = seen.get(listing.item_id)
+            if prev_price is None:
+                # Never seen before
+                new_listings.append(listing)
+            elif prev_price > 0 and listing.price < prev_price:
+                # Price dropped since last scan
+                price_drops.append((listing, prev_price))
 
         self.new_listing_ids = [l.item_id for l in new_listings]
+        self.price_drop_ids = [l.item_id for l, _ in price_drops]
 
-        # Fire events for each new listing
+        # Fire events for new listings
         for listing in new_listings:
             self.hass.bus.async_fire(
                 EVENT_NEW_LISTING,
@@ -176,17 +185,41 @@ class EbaySearchCoordinator(DataUpdateCoordinator[EbaySearchResult]):
                 },
             )
             _LOGGER.info(
-                "New eBay listing found [%s]: %s - $%.2f (%s)",
+                "New eBay listing [%s]: %s - $%.2f (%s)",
                 self.search_name,
                 listing.title,
                 listing.price,
                 listing.item_id,
             )
 
-        # Mark all current results as seen
+        # Fire events for price drops
+        for listing, old_price in price_drops:
+            drop_amount = old_price - listing.price
+            drop_pct = (drop_amount / old_price) * 100
+            self.hass.bus.async_fire(
+                EVENT_PRICE_DROP,
+                {
+                    "search_name": self.search_name,
+                    "previous_price": old_price,
+                    "drop_amount": round(drop_amount, 2),
+                    "drop_percentage": round(drop_pct, 1),
+                    **listing.as_dict(),
+                },
+            )
+            _LOGGER.info(
+                "Price drop [%s]: %s - $%.2f → $%.2f (-%s%%) (%s)",
+                self.search_name,
+                listing.title,
+                old_price,
+                listing.price,
+                f"{drop_pct:.1f}",
+                listing.item_id,
+            )
+
+        # Update seen store with current prices for all listings
         if result.listings:
-            all_ids = [l.item_id for l in result.listings]
-            self._store.mark_seen(self.search_name, all_ids)
+            items = {l.item_id: l.price for l in result.listings}
+            self._store.mark_seen(self.search_name, items)
             await self._store.async_save()
 
         return result
