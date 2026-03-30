@@ -51,7 +51,7 @@
       },
       "configure_notifications": {
         "title": "Notification Services",
-        "description": "Enter notify service names separated by commas.\nExample: {example}",
+        "description": "Select the notification services to use for eBay alerts.",
         "data": {
           "notify_services": "Notify services (comma-separated)"
         }
