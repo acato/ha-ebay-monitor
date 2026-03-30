@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity,
-)
+from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -30,15 +27,15 @@ async def async_setup_entry(
 
     entities = []
     for search_name, coordinator in coordinators.items():
-        entities.append(EbayMonitorMatchSensor(coordinator, entry))
+        entities.append(EbayMonitorAlertSensor(coordinator, entry))
 
     async_add_entities(entities)
 
 
-class EbayMonitorMatchSensor(
+class EbayMonitorAlertSensor(
     CoordinatorEntity[EbaySearchCoordinator], BinarySensorEntity
 ):
-    """Binary sensor that is ON when new unseen listings are found."""
+    """Binary sensor that is ON when new listings or price drops were found."""
 
     _attr_icon = "mdi:alert-decagram"
 
@@ -51,17 +48,19 @@ class EbayMonitorMatchSensor(
         super().__init__(coordinator)
 
         self._search_name = coordinator.search_name
-        self._attr_unique_id = f"{entry.entry_id}_{self._search_name}_match"
-        self._attr_name = f"eBay {self._search_name.replace('_', ' ').title()} Match"
+        self._attr_unique_id = f"{entry.entry_id}_{self._search_name}_alert"
+        self._attr_name = (
+            f"eBay {self._search_name.replace('_', ' ').title()} Alert"
+        )
 
     @property
     def is_on(self) -> bool | None:
-        """Return True if new listings or price drops were found in the last scan."""
+        """Return True if new listings or price drops were detected."""
         if self.coordinator.data is None:
             return None
         return (
             len(self.coordinator.new_listing_ids) > 0
-            or len(getattr(self.coordinator, "price_drop_ids", [])) > 0
+            or len(self.coordinator.price_drop_ids) > 0
         )
 
     @property

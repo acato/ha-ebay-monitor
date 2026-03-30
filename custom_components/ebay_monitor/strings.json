@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "eBay API Credentials",
-        "description": "Enter your eBay Developer Program credentials. Get them at {developer_url}",
+        "description": "Enter your eBay Developer Program credentials.\nGet them at {developer_url}",
         "data": {
           "app_id": "App ID (Client ID)",
           "cert_id": "Cert ID (Client Secret)",
@@ -12,7 +12,7 @@
       }
     },
     "error": {
-      "invalid_auth": "Invalid credentials. Verify your App ID and Cert ID at developer.ebay.com."
+      "invalid_auth": "Invalid credentials. Could not obtain an OAuth2 token. Verify your App ID and Cert ID."
     },
     "abort": {
       "already_configured": "This eBay account is already configured."
@@ -21,11 +21,12 @@
   "options": {
     "step": {
       "init": {
-        "title": "eBay Monitor Searches",
-        "description": "{searches}",
+        "title": "eBay Monitor Settings",
+        "description": "{searches}\n{notify_services}",
         "menu_options": {
           "add_search": "Add a new search",
-          "remove_search": "Remove a search"
+          "remove_search": "Remove a search",
+          "configure_notifications": "Configure notifications"
         }
       },
       "add_search": {
@@ -36,16 +37,23 @@
           "max_price": "Maximum price (USD)",
           "min_price": "Minimum price (USD)",
           "condition": "Item condition(s)",
-          "location_country": "Seller country (e.g. US, GB, DE)",
+          "location_country": "Seller country (e.g. US)",
           "buying_options": "Listing type(s)",
           "category_id": "eBay category ID (optional)",
-          "scan_interval": "Scan interval (minutes)"
+          "scan_interval": "Scan interval (minutes, default 60)"
         }
       },
       "remove_search": {
         "title": "Remove eBay Search",
         "data": {
           "search_to_remove": "Search to remove"
+        }
+      },
+      "configure_notifications": {
+        "title": "Notification Services",
+        "description": "Enter notify service names separated by commas.\nExample: {example}",
+        "data": {
+          "notify_services": "Notify services (comma-separated)"
         }
       }
     },

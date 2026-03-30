@@ -17,10 +17,11 @@ CONF_LOCATION_COUNTRY = "location_country"
 CONF_BUYING_OPTIONS = "buying_options"
 CONF_CATEGORY_ID = "category_id"
 CONF_SCAN_INTERVAL = "scan_interval"
+CONF_NOTIFY_SERVICES = "notify_services"
 
 # Defaults
 DEFAULT_SITE = "EBAY_US"
-DEFAULT_SCAN_INTERVAL = 15  # minutes
+DEFAULT_SCAN_INTERVAL = 60  # minutes (1 hour)
 DEFAULT_MAX_SEEN_IDS = 1000
 
 # eBay API endpoints

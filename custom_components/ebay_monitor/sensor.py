@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -34,7 +35,7 @@ async def async_setup_entry(
 
 
 class EbayMonitorSensor(CoordinatorEntity[EbaySearchCoordinator], SensorEntity):
-    """Sensor showing eBay search results."""
+    """Sensor showing the number of matching eBay listings for a search."""
 
     _attr_icon = "mdi:shopping"
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -54,10 +55,10 @@ class EbayMonitorSensor(CoordinatorEntity[EbaySearchCoordinator], SensorEntity):
 
     @property
     def native_value(self) -> int | None:
-        """Return the number of new (unseen) listings from last scan."""
+        """Return the total number of matching listings."""
         if self.coordinator.data is None:
             return None
-        return len(self.coordinator.new_listing_ids)
+        return self.coordinator.data.total_results
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -68,16 +69,33 @@ class EbayMonitorSensor(CoordinatorEntity[EbaySearchCoordinator], SensorEntity):
         result = self.coordinator.data
         config = self.coordinator.search_config
 
-        # Include up to 10 latest listings as attributes
+        # Find cheapest listing
+        cheapest_price: float | None = None
+        cheapest_title: str | None = None
+        cheapest_url: str | None = None
+        if result.listings:
+            cheapest = min(result.listings, key=lambda x: x.price)
+            cheapest_price = cheapest.price
+            cheapest_title = cheapest.title
+            cheapest_url = cheapest.url
+
+        # Top 10 listings for attribute inspection
         latest = [listing.as_dict() for listing in result.listings[:10]]
 
         return {
             "total_results": result.total_results,
-            "latest_listings": latest,
+            "cheapest_price": cheapest_price,
+            "cheapest_title": cheapest_title,
+            "cheapest_url": cheapest_url,
+            "last_updated": datetime.now().isoformat(),
             "search_query": config.get(CONF_SEARCH_QUERY, ""),
             "max_price": config.get(CONF_MAX_PRICE),
+            "new_listing_count": len(self.coordinator.new_listing_ids),
             "new_listing_ids": self.coordinator.new_listing_ids,
+            "price_drop_count": len(self.coordinator.price_drop_ids),
+            "price_drop_ids": self.coordinator.price_drop_ids,
             "search_name": self._search_name,
+            "latest_listings": latest,
         }
 
     @property

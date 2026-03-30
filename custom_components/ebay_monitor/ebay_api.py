@@ -40,7 +40,7 @@ class EbayListing:
     category: str
 
     def as_dict(self) -> dict[str, Any]:
-        """Return listing as a dictionary for sensor attributes."""
+        """Return listing as a dictionary for sensor attributes and events."""
         return {
             "item_id": self.item_id,
             "title": self.title,
@@ -58,6 +58,11 @@ class EbayListing:
             "item_location": self.item_location,
             "category": self.category,
         }
+
+    @property
+    def is_fixed_price(self) -> bool:
+        """Return True if the listing has a Buy It Now / fixed price option."""
+        return "FIXED_PRICE" in self.buying_options
 
 
 @dataclass
@@ -88,9 +93,12 @@ class EbayApiClient:
         self._token_expiry: float = 0
 
     async def _ensure_token(self) -> None:
-        """Obtain or refresh the application access token."""
+        """Obtain or refresh the application access token.
+
+        Tokens last 2 hours (7200s). We refresh with a 5-minute buffer.
+        """
         if self._access_token and time.time() < self._token_expiry - 300:
-            return  # Token still valid (with 5-minute buffer)
+            return
 
         credentials = base64.b64encode(
             f"{self._app_id}:{self._cert_id}".encode()
@@ -123,9 +131,11 @@ class EbayApiClient:
 
                 result = await resp.json()
                 self._access_token = result["access_token"]
-                # Token expires_in is in seconds (typically 7200 = 2 hours)
                 self._token_expiry = time.time() + result.get("expires_in", 7200)
-                _LOGGER.debug("eBay access token refreshed, expires in %s seconds", result.get("expires_in"))
+                _LOGGER.debug(
+                    "eBay access token refreshed, expires in %s seconds",
+                    result.get("expires_in"),
+                )
 
         except aiohttp.ClientError as err:
             _LOGGER.error("Network error during eBay token request: %s", err)
@@ -146,7 +156,7 @@ class EbayApiClient:
         """Search eBay for listings matching the criteria."""
         await self._ensure_token()
 
-        # Build filter string
+        # Build filter string per Browse API spec
         filters = []
 
         if conditions:
@@ -216,7 +226,6 @@ class EbayApiClient:
             location_info = item.get("itemLocation", {})
             categories = item.get("categories", [{}])
 
-            # Build location string
             loc_parts = []
             if location_info.get("city"):
                 loc_parts.append(location_info["city"])
@@ -226,11 +235,7 @@ class EbayApiClient:
                 loc_parts.append(location_info["country"])
             location_str = ", ".join(loc_parts) if loc_parts else "Unknown"
 
-            # Determine time remaining for auctions
-            time_remaining = None
-            item_end_date = item.get("itemEndDate")
-            if item_end_date:
-                time_remaining = item_end_date  # ISO 8601; we parse in the sensor
+            time_remaining = item.get("itemEndDate")
 
             listing = EbayListing(
                 item_id=item.get("itemId", ""),
@@ -265,7 +270,7 @@ class EbayApiClient:
         return EbaySearchResult(total_results=total, listings=listings)
 
     async def validate_credentials(self) -> bool:
-        """Test if the API credentials are valid."""
+        """Test if the API credentials are valid by fetching a token."""
         try:
             await self._ensure_token()
             return True

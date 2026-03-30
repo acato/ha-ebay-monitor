@@ -27,6 +27,7 @@ from .const import (
     CONF_LOCATION_COUNTRY,
     CONF_MAX_PRICE,
     CONF_MIN_PRICE,
+    CONF_NOTIFY_SERVICES,
     CONF_SCAN_INTERVAL,
     CONF_SEARCH_NAME,
     CONF_SEARCH_QUERY,
@@ -54,7 +55,6 @@ class EbayMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Test the credentials
             session = async_get_clientsession(self.hass)
             client = EbayApiClient(
                 app_id=user_input[CONF_APP_ID],
@@ -64,7 +64,6 @@ class EbayMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
             if await client.validate_credentials():
-                # Prevent duplicate entries
                 await self.async_set_unique_id(user_input[CONF_APP_ID])
                 self._abort_if_unique_id_configured()
 
@@ -75,7 +74,10 @@ class EbayMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_CERT_ID: user_input[CONF_CERT_ID],
                         CONF_SITE: user_input.get(CONF_SITE, DEFAULT_SITE),
                     },
-                    options={CONF_SEARCHES: []},
+                    options={
+                        CONF_SEARCHES: [],
+                        CONF_NOTIFY_SERVICES: [],
+                    },
                 )
             else:
                 errors["base"] = "invalid_auth"
@@ -105,13 +107,16 @@ class EbayMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class EbayMonitorOptionsFlow(OptionsFlow):
-    """Handle options flow for eBay Monitor (manage searches)."""
+    """Handle options flow for eBay Monitor (manage searches + notifications)."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize options flow."""
         self._config_entry = config_entry
         self._searches: list[dict[str, Any]] = list(
             config_entry.options.get(CONF_SEARCHES, [])
+        )
+        self._notify_services: list[str] = list(
+            config_entry.options.get(CONF_NOTIFY_SERVICES, [])
         )
 
     async def async_step_init(
@@ -120,21 +125,25 @@ class EbayMonitorOptionsFlow(OptionsFlow):
         """Manage searches: show menu."""
         search_names = [s[CONF_SEARCH_NAME] for s in self._searches]
 
-        menu_options = ["add_search"]
+        menu_options = ["add_search", "configure_notifications"]
         if search_names:
-            menu_options.append("remove_search")
-
-        # Show current searches as description
-        description = (
-            f"Current searches: {', '.join(search_names)}"
-            if search_names
-            else "No searches configured yet."
-        )
+            menu_options.insert(1, "remove_search")
 
         return self.async_show_menu(
             step_id="init",
             menu_options=menu_options,
-            description_placeholders={"searches": description},
+            description_placeholders={
+                "searches": (
+                    f"Current searches: {', '.join(search_names)}"
+                    if search_names
+                    else "No searches configured yet."
+                ),
+                "notify_services": (
+                    f"Notify via: {', '.join(self._notify_services)}"
+                    if self._notify_services
+                    else "No notification services configured."
+                ),
+            },
         )
 
     async def async_step_add_search(
@@ -144,7 +153,6 @@ class EbayMonitorOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Validate search name is unique
             existing_names = {s[CONF_SEARCH_NAME] for s in self._searches}
             search_name = user_input[CONF_SEARCH_NAME].lower().replace(" ", "_")
             user_input[CONF_SEARCH_NAME] = search_name
@@ -152,18 +160,19 @@ class EbayMonitorOptionsFlow(OptionsFlow):
             if search_name in existing_names:
                 errors[CONF_SEARCH_NAME] = "name_exists"
             else:
-                # Clean up optional fields
                 search = {
                     k: v for k, v in user_input.items() if v is not None and v != ""
                 }
-                # Ensure search_name and query are always present
                 search[CONF_SEARCH_NAME] = search_name
                 search[CONF_SEARCH_QUERY] = user_input[CONF_SEARCH_QUERY]
 
                 self._searches.append(search)
                 return self.async_create_entry(
                     title="",
-                    data={CONF_SEARCHES: self._searches},
+                    data={
+                        CONF_SEARCHES: self._searches,
+                        CONF_NOTIFY_SERVICES: self._notify_services,
+                    },
                 )
 
         return self.async_show_form(
@@ -201,10 +210,15 @@ class EbayMonitorOptionsFlow(OptionsFlow):
             ]
             return self.async_create_entry(
                 title="",
-                data={CONF_SEARCHES: self._searches},
+                data={
+                    CONF_SEARCHES: self._searches,
+                    CONF_NOTIFY_SERVICES: self._notify_services,
+                },
             )
 
-        search_names = {s[CONF_SEARCH_NAME]: s[CONF_SEARCH_NAME] for s in self._searches}
+        search_names = {
+            s[CONF_SEARCH_NAME]: s[CONF_SEARCH_NAME] for s in self._searches
+        }
 
         return self.async_show_form(
             step_id="remove_search",
@@ -213,4 +227,42 @@ class EbayMonitorOptionsFlow(OptionsFlow):
                     vol.Required("search_to_remove"): vol.In(search_names),
                 }
             ),
+        )
+
+    async def async_step_configure_notifications(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure notification services."""
+        if user_input is not None:
+            raw = user_input.get(CONF_NOTIFY_SERVICES, "")
+            if raw.strip():
+                self._notify_services = [
+                    s.strip() for s in raw.split(",") if s.strip()
+                ]
+            else:
+                self._notify_services = []
+
+            return self.async_create_entry(
+                title="",
+                data={
+                    CONF_SEARCHES: self._searches,
+                    CONF_NOTIFY_SERVICES: self._notify_services,
+                },
+            )
+
+        current = ", ".join(self._notify_services)
+
+        return self.async_show_form(
+            step_id="configure_notifications",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_NOTIFY_SERVICES,
+                        default=current,
+                    ): str,
+                }
+            ),
+            description_placeholders={
+                "example": "mobile_app_iphone, telegram, persistent_notification"
+            },
         )
