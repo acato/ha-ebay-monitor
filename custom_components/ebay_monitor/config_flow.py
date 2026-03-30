@@ -261,10 +261,10 @@ class EbayMonitorOptionsFlow(OptionsFlow):
                 continue
             notify_services[service_name] = service_name
 
-        # Pre-select currently configured services
-        default = {
-            svc: svc in self._notify_services for svc in notify_services
-        }
+        # Pre-select currently configured services (must be a list of keys)
+        default = [
+            svc for svc in self._notify_services if svc in notify_services
+        ]
 
         return self.async_show_form(
             step_id="configure_notifications",
