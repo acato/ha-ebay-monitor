@@ -1,1 +1,5 @@
-{}
+{
+  "rewrites": [
+    { "source": "/marketplace-deletion", "destination": "/api/marketplace-deletion" }
+  ]
+}
