@@ -7,6 +7,7 @@ from typing import Any
 
 import voluptuous as vol
 
+import homeassistant.helpers.config_validation as cv
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -183,12 +184,12 @@ class EbayMonitorOptionsFlow(OptionsFlow):
                     vol.Required(CONF_SEARCH_QUERY): str,
                     vol.Optional(CONF_MAX_PRICE): vol.Coerce(float),
                     vol.Optional(CONF_MIN_PRICE): vol.Coerce(float),
-                    vol.Optional(CONF_CONDITION): vol.All(
-                        vol.Ensure(list), [vol.In(CONDITIONS)]
+                    vol.Optional(CONF_CONDITION): cv.multi_select(
+                        {c: c for c in CONDITIONS}
                     ),
                     vol.Optional(CONF_LOCATION_COUNTRY): str,
-                    vol.Optional(CONF_BUYING_OPTIONS): vol.All(
-                        vol.Ensure(list), [vol.In(BUYING_OPTIONS)]
+                    vol.Optional(CONF_BUYING_OPTIONS): cv.multi_select(
+                        {o: o for o in BUYING_OPTIONS}
                     ),
                     vol.Optional(CONF_CATEGORY_ID): str,
                     vol.Optional(
