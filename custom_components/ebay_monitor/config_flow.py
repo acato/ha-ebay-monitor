@@ -235,11 +235,14 @@ class EbayMonitorOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         """Configure notification services."""
         if user_input is not None:
-            raw = user_input.get(CONF_NOTIFY_SERVICES, "")
-            if raw.strip():
+            selected = user_input.get(CONF_NOTIFY_SERVICES, [])
+            # cv.multi_select returns a dict {key: bool}, extract selected keys
+            if isinstance(selected, dict):
                 self._notify_services = [
-                    s.strip() for s in raw.split(",") if s.strip()
+                    k for k, v in selected.items() if v
                 ]
+            elif isinstance(selected, list):
+                self._notify_services = selected
             else:
                 self._notify_services = []
 
@@ -251,7 +254,17 @@ class EbayMonitorOptionsFlow(OptionsFlow):
                 },
             )
 
-        current = ", ".join(self._notify_services)
+        # Discover available notify services
+        notify_services = {}
+        for service_name in self.hass.services.async_services().get("notify", {}):
+            if service_name == "send_message":
+                continue
+            notify_services[service_name] = service_name
+
+        # Pre-select currently configured services
+        default = {
+            svc: svc in self._notify_services for svc in notify_services
+        }
 
         return self.async_show_form(
             step_id="configure_notifications",
@@ -259,11 +272,8 @@ class EbayMonitorOptionsFlow(OptionsFlow):
                 {
                     vol.Optional(
                         CONF_NOTIFY_SERVICES,
-                        default=current,
-                    ): str,
+                        default=default,
+                    ): cv.multi_select(notify_services),
                 }
             ),
-            description_placeholders={
-                "example": "mobile_app_iphone, telegram, persistent_notification"
-            },
         )
