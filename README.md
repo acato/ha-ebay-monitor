@@ -444,3 +444,7 @@ MIT License. See [LICENSE](LICENSE) for details.
 ## Contributing
 
 Contributions are welcome. Please open an issue or submit a pull request.
+
+## Trademark Disclaimer
+
+eBay and the eBay logo are trademarks of eBay Inc. This project is not affiliated with, endorsed by, or sponsored by eBay Inc. Use of the eBay API is subject to the [eBay API License Agreement](https://developer.ebay.com/join/api-license-agreement).
